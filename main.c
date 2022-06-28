@@ -7,9 +7,9 @@
 
 void checkArguments (int argc)
 {
-	if (argc == 1)
+	if (argc != 4)
 	{
-		printf("REQUIRED ARGUMENTS:\n~~~~~~~~~~~~~~~~~~~\n\n[*] argv[0] = ./main\n[*] argv[1] = input dump filename\n[*] argv[2] = input dihedral filename.\n\n");
+		printf("REQUIRED ARGUMENTS:\n~~~~~~~~~~~~~~~~~~~\n\n[*] argv[0] = ./main\n[*] argv[1] = input dump filename\n[*] argv[2] = input dihedral filename\n[*] argv[3] = number of timeframes to skip\n\n");
 		exit (1);
 	}
 }
@@ -99,10 +99,11 @@ char **getDumpDihedralLines (FILE *input, char **dumpDihedralLines, int nEntries
 
 }
 
-void printFixedOutput (FILE *inputDump, int nAtoms, FILE *inputDihedral, int nDihedrals, FILE *outputDump, FILE *outputDihedral)
+void printFixedOutput (FILE *inputDump, int nAtoms, FILE *inputDihedral, int nDihedrals, FILE *outputDump, FILE *outputDihedral, int skipTimeframes)
 {
 	char dumpLine[2000], dihedralLine[2000];
 	int timestepDump = 0, timestepDihedral = 0, timestepDump_previous = 0, timestepDihedral_previous = 0, delTime = 0;
+	int nTimeframeDump = 0, nTimeframeDihedral = 0;
 	int isDumpFrameDefect = 0, isDihedralFrameDefect = 0;
 
 	char **dumpLines, **dihedralLines;
@@ -119,6 +120,9 @@ void printFixedOutput (FILE *inputDump, int nAtoms, FILE *inputDihedral, int nDi
 
 	do
 	{
+		nTimeframeDump++;
+		nTimeframeDihedral++;
+
 		timestepDump_previous = timestepDump;
 		timestepDihedral_previous = timestepDihedral;
 
@@ -140,15 +144,20 @@ void printFixedOutput (FILE *inputDump, int nAtoms, FILE *inputDihedral, int nDi
 		dumpLines = getDumpDihedralLines (inputDump, dumpLines, nAtoms, &timestepDump, &isDumpFrameDefect);
 		dihedralLines = getDumpDihedralLines (inputDihedral, dihedralLines, nDihedrals, &timestepDihedral, &isDihedralFrameDefect);
 
+		if (nTimeframeDump <= skipTimeframes)
+		{
+			printf("Skipping timeframes: %d\n", nTimeframeDump);
+			goto skipThisTimeframe;
+		}
+
 		// If timestepDump == timestepDihedral, then print both dumpLines and dihedralLines
 		if (timestepDump == timestepDihedral)
 		{
-			printf("\rPrinting timeframe (1): %d                         ", timestepDump, timestepDump_previous);
+			printf("\rPrinting timeframe (1): %d (%d)                        ", timestepDump, nTimeframeDump);
 			fflush (stdout);
 
 			if (timestepDump_previous > timestepDump)
 			{
-				sleep (10);
 				goto endThisCode;
 			}
 
@@ -167,7 +176,7 @@ void printFixedOutput (FILE *inputDump, int nAtoms, FILE *inputDihedral, int nDi
 
 			if (timestepDump == timestepDihedral)
 			{
-				printf("\rPrinting timeframe (2): %d                         ", timestepDump);
+				printf("\rPrinting timeframe (2): %d (%d)                        ", timestepDump, nTimeframeDump);
 				fflush (stdout);
 
 				for (int i = 0; i < (nAtoms + 9); ++i) fprintf(outputDump, "%s", dumpLines[i]);
@@ -184,7 +193,7 @@ void printFixedOutput (FILE *inputDump, int nAtoms, FILE *inputDihedral, int nDi
 
 			if (timestepDump == timestepDihedral)
 			{
-				printf("\rPrinting timeframe (3): %d                         ", timestepDump);
+				printf("\rPrinting timeframe (3): %d (%d)                        ", timestepDump, nTimeframeDump);
 				fflush (stdout);
 
 				for (int i = 0; i < (nAtoms + 9); ++i) fprintf(outputDump, "%s", dumpLines[i]);
@@ -192,7 +201,9 @@ void printFixedOutput (FILE *inputDump, int nAtoms, FILE *inputDihedral, int nDi
 			}
 		}
 
-	} while ((timestepDump_previous != timestepDump) || (timestepDihedral_previous != timestepDihedral));
+		skipThisTimeframe: ;
+
+	} while (1);
 
 	endThisCode: ;
 	printf("\n");
@@ -208,6 +219,7 @@ int main(int argc, char const *argv[])
 	FILE *inputDump, *inputDihedral, *outputDump, *outputDihedral;
 
 	int isXZ_dump = -1, isXZ_dihedral = -1;
+	int skipTimeframes = atoi (argv[3]);
 	char *pipeString;
 	pipeString = (char *) malloc (500 * sizeof (char));
 
@@ -251,7 +263,7 @@ int main(int argc, char const *argv[])
 
 	else { rewind (inputDihedral); }
 
-	printFixedOutput (inputDump, nAtoms, inputDihedral, nDihedrals, outputDump, outputDihedral);
+	printFixedOutput (inputDump, nAtoms, inputDihedral, nDihedrals, outputDump, outputDihedral, skipTimeframes);
 
 	char *xzCompressionString;
 	xzCompressionString = (char *) malloc (200 * sizeof (char));
